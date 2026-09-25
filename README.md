@@ -53,12 +53,12 @@ Give Tasker **Unrestricted** battery use and notification permission.
    - URL:
 
      ```
-     https://api.todoist.com/api/v1/tasks/filter?query=((overdue%20%7C%203%20days)%20%7C%20p1)%20%26%20!%40weather&limit=200
+     https://api.todoist.com/api/v1/tasks/filter?query=((overdue%20%7C%203%20days)%20%7C%20p1)%20%26%20!%40weather%20%26%20!%40meal&limit=200
      ```
 
-     That query is `((overdue | 3 days) | p1) & !@weather`.
+     That query is `((overdue | 3 days) | p1) & !@weather & !@meal`.
 
-     The `!@weather` clause keeps the 7:00 forecast tasks out of this list. Add it after the weather task has run once (that run creates the `weather` label). Until then, leave the clause off — a missing label can make the filter fail.
+     `!@weather` and `!@meal` keep the forecast and Paprika meal tasks out of this list. Add each clause after that task has run once (the run creates the label). Until then, leave the missing label out — a missing label can make the filter fail.
    - Header: `Authorization: Bearer %TODOIST_TOKEN`
    - Output prefix: `todoist` (this creates `%todoist_http_data`)
    - Continue Task After Error: on
@@ -140,6 +140,39 @@ After the first successful run, add `& !@weather` to the digest HTTP query so th
 | `%WEATHER_BODY` | The seven lines, for a test run |
 | `%WEATHER_COUNT` | Days written |
 | `%WEATHER_DEBUG` | `ok 7`, or the skip / error reason |
+
+## Paprika meals
+
+[`paprika-meals.js`](paprika-meals.js) runs daily and writes one Todoist task for each meal on the Paprika Meals calendar from today through the same date next month.
+
+The task title is an icon plus the meal name. Breakfast, Lunch, Dinner and Dessert get an icon; any other meal type is included with the name only. A type you remove is no longer synced. FODMAP status marks at the start of the Paprika name (✅, ℹ️, ❌, and the older coloured circles) are left off the Todoist title.
+
+```
+🍳 Sourbread French Toast
+🥗 Baked potato
+🍽️ Salmon
+🍰 Rhubarb with ice cream
+```
+
+The due date is the meal day. Tasks are labelled `meal`. The next run updates these tasks and deletes ones that have left the window or the planner.
+
+### Profile
+
+Time 7:05 AM → 7:06 AM, repeat 1 hour (same Pixel workaround as the digest).
+
+### Task actions
+
+1. In **Vars**, set `%PAPRIKA_USERNAME` and `%PAPRIKA_PASSWORD` once (the Paprika account email and password). `%TODOIST_TOKEN` is the token already used by the digest.
+2. **JavaScript** — path `Download/paprika-meals.js`, or paste the file into a JavaScriptlet. Auto Exit on, timeout 90s. Save with ✓.
+
+After the first successful run, add `& !@meal` to the digest HTTP query so these tasks stay out of the 9:00 list.
+
+| Variable | Purpose |
+| --- | --- |
+| `%MEALS_SKIP` | `1` = nothing written |
+| `%MEALS_BODY` | The lines written, for a test run |
+| `%MEALS_COUNT` | Meals written |
+| `%MEALS_DEBUG` | `ok 12`, or the skip / error reason |
 
 ## License
 
