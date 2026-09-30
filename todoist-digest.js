@@ -6,7 +6,7 @@
 //   MORNING_TODOIST_SKIP, TITLE, BODY, HTML, URGENT, TOTAL, SHOWN
 //   MENU_LABELS, MENU_URLS
 //
-// Paste the body of this file into Tasker → Code → JavaScriptlet.
+// Loaded by the Todoist Daily Reminder task from Tasker/scripts/todoist-digest.js.
 
 function pick(name, isGlobal) {
   var v;

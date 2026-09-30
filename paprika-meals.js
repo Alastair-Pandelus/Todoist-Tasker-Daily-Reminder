@@ -5,8 +5,13 @@
 // Daily profile. Copies scheduled meals from today through the same
 // date next month. The Todoist title is an icon plus the meal name,
 // without the FODMAP status mark Paprika puts at the start of the recipe.
-// Breakfast, Lunch, Dinner and Dessert get an icon. The same tasks are
-// updated; meals that leave the window or the planner are deleted.
+// Breakfast, Lunch and Dinner get an icon. Breakfast is due at 9:00,
+// lunch at 13:00 and dinner at 20:00 in the phone's local time.
+// Dessert on the same day is added onto the dinner title, and that
+// task stays at 20:00. A lunchtime snack (hummus, oatcakes with cheese)
+// is added onto that day's lunch main, and that task stays at 13:00.
+// Other meal types stay all-day. The same tasks
+// are updated; meals that leave the window or the planner are deleted.
 //
 // Needs %TODOIST_TOKEN, %PAPRIKA_USERNAME, and %PAPRIKA_PASSWORD.
 
@@ -88,9 +93,173 @@ function mealIcon(name) {
   return "";
 }
 
-function dueYmd(task) {
-  if (!task || !task.due || !task.due.date) return "";
-  return String(task.due.date).substring(0, 10);
+function mealTime(name) {
+  var n = String(name || "").toLowerCase();
+  if (n === "breakfast") return "09:00";
+  if (n === "lunch") return "13:00";
+  if (n === "dinner") return "20:00";
+  return "";
+}
+
+function mealSlot(name) {
+  var n = String(name || "").toLowerCase();
+  if (n === "dinner") return "dinner";
+  if (n === "dessert" || n === "desserts") return "dessert";
+  if (n === "lunch") return "lunch";
+  return "";
+}
+
+function isLunchSnack(content) {
+  var n = String(content || "").toLowerCase();
+  if (n.indexOf("hummus") >= 0) return true;
+  if (n.indexOf("oatcake") >= 0) return true;
+  return false;
+}
+
+function foldLunchSnacks(plans) {
+  var rest = [];
+  var byDate = {};
+  var dates = [];
+  var i;
+  for (i = 0; i < plans.length; i++) {
+    var plan = plans[i];
+    if (plan.slot !== "lunch") {
+      rest.push(plan);
+      continue;
+    }
+    if (!byDate[plan.date]) {
+      byDate[plan.date] = [];
+      dates.push(plan.date);
+    }
+    byDate[plan.date].push(plan);
+  }
+  var absorbed = {};
+  for (i = 0; i < dates.length; i++) {
+    var group = byDate[dates[i]];
+    var mains = [];
+    var snacks = [];
+    var j;
+    for (j = 0; j < group.length; j++) {
+      if (isLunchSnack(group[j].content)) snacks.push(group[j]);
+      else mains.push(group[j]);
+    }
+    if (!snacks.length || !mains.length) {
+      for (j = 0; j < group.length; j++) rest.push(group[j]);
+      continue;
+    }
+    var parts = [];
+    var primary = mains[0];
+    var source;
+    for (j = 0; j < mains.length; j++) {
+      source = mains[j];
+      parts.push(source.content);
+      if (j > 0) absorbed[source.uid] = true;
+    }
+    for (j = 0; j < snacks.length; j++) {
+      source = snacks[j];
+      parts.push(source.content);
+      absorbed[source.uid] = true;
+    }
+    rest.push({
+      uid: primary.uid,
+      date: primary.date,
+      time: "13:00",
+      slot: "lunch",
+      content: parts.join(" "),
+      order: primary.order
+    });
+  }
+  return { plans: rest, absorbed: absorbed };
+}
+
+function foldDinnerDessert(plans) {
+  var rest = [];
+  var byDate = {};
+  var dates = [];
+  var i;
+  for (i = 0; i < plans.length; i++) {
+    var plan = plans[i];
+    if (plan.slot !== "dinner" && plan.slot !== "dessert") {
+      rest.push(plan);
+      continue;
+    }
+    if (!byDate[plan.date]) {
+      byDate[plan.date] = [];
+      dates.push(plan.date);
+    }
+    byDate[plan.date].push(plan);
+  }
+  var absorbed = {};
+  for (i = 0; i < dates.length; i++) {
+    var group = byDate[dates[i]];
+    var dinners = [];
+    var desserts = [];
+    var j;
+    for (j = 0; j < group.length; j++) {
+      if (group[j].slot === "dessert") desserts.push(group[j]);
+      else dinners.push(group[j]);
+    }
+    var parts = [];
+    var primary = null;
+    var source;
+    for (j = 0; j < dinners.length; j++) {
+      source = dinners[j];
+      parts.push(source.content);
+      if (!primary) primary = source;
+      else absorbed[source.uid] = true;
+    }
+    for (j = 0; j < desserts.length; j++) {
+      source = desserts[j];
+      parts.push(source.content);
+      if (!primary) primary = source;
+      else absorbed[source.uid] = true;
+    }
+    rest.push({
+      uid: primary.uid,
+      date: primary.date,
+      time: "20:00",
+      content: parts.join(" "),
+      order: primary.order
+    });
+  }
+  return { plans: rest, absorbed: absorbed };
+}
+
+function dueDateTime(dateYmd, hm) {
+  var dp = String(dateYmd).split("-");
+  var tp = String(hm).split(":");
+  var local = new Date(+dp[0], +dp[1] - 1, +dp[2], +tp[0], +tp[1], 0, 0);
+  return local.getUTCFullYear() + "-" + pad(local.getUTCMonth() + 1) + "-" +
+    pad(local.getUTCDate()) + "T" + pad(local.getUTCHours()) + ":" +
+    pad(local.getUTCMinutes()) + ":00Z";
+}
+
+function dueRaw(task) {
+  if (!task || !task.due) return "";
+  if (task.due.datetime) return String(task.due.datetime);
+  if (task.due.date) return String(task.due.date);
+  return "";
+}
+
+function sameDue(task, plan) {
+  var raw = dueRaw(task);
+  if (!plan.time) return raw.substring(0, 10) === plan.date && raw.indexOf("T") < 0;
+  var expected = dueDateTime(plan.date, plan.time);
+  if (raw === expected || raw.indexOf(expected.substring(0, 16)) === 0) return true;
+  var parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) return false;
+  var dp = plan.date.split("-");
+  var tp = plan.time.split(":");
+  return parsed.getFullYear() === +dp[0] &&
+    (parsed.getMonth() + 1) === +dp[1] &&
+    parsed.getDate() === +dp[2] &&
+    parsed.getHours() === +tp[0] &&
+    parsed.getMinutes() === +tp[1];
+}
+
+function dueFields(plan) {
+  if (plan.time) return { due_datetime: dueDateTime(plan.date, plan.time) };
+  return { due_date: plan.date };
 }
 
 function hasLabel(task) {
@@ -205,17 +374,31 @@ function run() {
     plans.push({
       uid: String(meal.uid),
       date: date,
+      time: mealTime(kind.name),
+      slot: mealSlot(kind.name),
       content: mealIcon(kind.name) + title,
       order: kind.order
     });
   }
 
-  plans.sort(function (a, b) {
+  function byMeal(a, b) {
     if (a.date !== b.date) return a.date < b.date ? -1 : 1;
     if (a.order !== b.order) return a.order - b.order;
     if (a.content !== b.content) return a.content < b.content ? -1 : 1;
     return a.uid < b.uid ? -1 : 1;
-  });
+  }
+
+  plans.sort(byMeal);
+  var folded = foldDinnerDessert(plans);
+  plans = folded.plans;
+  var absorbed = folded.absorbed;
+  var lunchFold = foldLunchSnacks(plans);
+  plans = lunchFold.plans;
+  var lunchUid;
+  for (lunchUid in lunchFold.absorbed) {
+    if (lunchFold.absorbed.hasOwnProperty(lunchUid)) absorbed[lunchUid] = true;
+  }
+  plans.sort(byMeal);
 
   var lines = [];
   for (i = 0; i < plans.length; i++) lines.push(plans[i].date + " " + plans[i].content);
@@ -266,23 +449,23 @@ function run() {
     var group = byUid[plan.uid] || [];
     var same = group.length &&
       group[0].content === plan.content &&
-      dueYmd(group[0]) === plan.date &&
+      sameDue(group[0], plan) &&
       hasLabel(group[0]);
+    var payload = {
+      content: plan.content,
+      description: MARKER + plan.uid,
+      labels: [LABEL]
+    };
+    var due = dueFields(plan);
+    var dueKey;
+    for (dueKey in due) {
+      if (due.hasOwnProperty(dueKey)) payload[dueKey] = due[dueKey];
+    }
     var res = null;
     if (!group.length) {
-      res = http("POST", "https://api.todoist.com/api/v1/tasks", JSON.stringify({
-        content: plan.content,
-        description: MARKER + plan.uid,
-        labels: [LABEL],
-        due_date: plan.date
-      }), auth);
+      res = http("POST", "https://api.todoist.com/api/v1/tasks", JSON.stringify(payload), auth);
     } else if (!same) {
-      res = http("POST", "https://api.todoist.com/api/v1/tasks/" + encodeURIComponent(group[0].id), JSON.stringify({
-        content: plan.content,
-        description: MARKER + plan.uid,
-        labels: [LABEL],
-        due_date: plan.date
-      }), auth);
+      res = http("POST", "https://api.todoist.com/api/v1/tasks/" + encodeURIComponent(group[0].id), JSON.stringify(payload), auth);
     }
     if (res && (res.status < 200 || res.status >= 300)) errors.push(plan.date + " " + res.status);
     for (i = 1; i < group.length; i++) {
@@ -293,7 +476,7 @@ function run() {
 
   var uidKey;
   for (uidKey in byUid) {
-    if (!byUid.hasOwnProperty(uidKey) || wanted[uidKey]) continue;
+    if (!byUid.hasOwnProperty(uidKey) || (wanted[uidKey] && !absorbed[uidKey])) continue;
     var stale = byUid[uidKey];
     for (i = 0; i < stale.length; i++) {
       var gone = http("DELETE", "https://api.todoist.com/api/v1/tasks/" + encodeURIComponent(stale[i].id), null, auth);

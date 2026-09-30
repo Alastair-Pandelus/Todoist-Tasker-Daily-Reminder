@@ -45,6 +45,8 @@ The 1-hour repeat is a Pixel workaround so the profile still fires once in that 
 
 Give Tasker **Unrestricted** battery use and notification permission.
 
+File-based scripts live on the phone in `/sdcard/Tasker/scripts/`, not Download. In a JavaScript action the path is `Tasker/scripts/filename.js`.
+
 ### Task actions
 
 1. **Variable Set** — `%TODOIST_TOKEN` to your token (or set it once under **Vars** and skip this step).
@@ -63,7 +65,7 @@ Give Tasker **Unrestricted** battery use and notification permission.
    - Output prefix: `todoist` (this creates `%todoist_http_data`)
    - Continue Task After Error: on
 3. **Variable Set** — `%TODOIST_JSON` to `%todoist_http_data`
-4. **JavaScriptlet** — paste [`todoist-digest.js`](todoist-digest.js). Auto Exit on, timeout 45s. Save with ✓ (swipe-back discards the script).
+4. **JavaScript** — path `Tasker/scripts/todoist-digest.js`. Auto Exit on, timeout 45s. Save with ✓.
 5. **Stop** — If `%MORNING_TODOIST_SKIP` `eq` `1` (skips the notification on empty days).
 6. **AutoNotification**
    - Title: `%MORNING_TODOIST_TITLE`
@@ -128,7 +130,7 @@ Time 7:00 AM → 7:01 AM, repeat 1 hour (same Pixel workaround as the digest).
 
 ### Task actions
 
-1. **JavaScriptlet** — paste [`weather-forecast.js`](weather-forecast.js). Auto Exit on, timeout 60s. Save with ✓.
+1. **JavaScript** — path `Tasker/scripts/weather-forecast.js`. Auto Exit on, timeout 60s. Save with ✓.
 
 `%TODOIST_TOKEN` is the same token as the digest. Forecast data comes from [Open-Meteo](https://open-meteo.com/) (no key) for Fintry (`56.05335`, `-4.22404`). Give Tasker unrestricted battery use.
 
@@ -145,16 +147,15 @@ After the first successful run, add `& !@weather` to the digest HTTP query so th
 
 [`paprika-meals.js`](paprika-meals.js) runs daily and writes one Todoist task for each meal on the Paprika Meals calendar from today through the same date next month.
 
-The task title is an icon plus the meal name. Breakfast, Lunch, Dinner and Dessert get an icon; any other meal type is included with the name only. A type you remove is no longer synced. FODMAP status marks at the start of the Paprika name (✅, ℹ️, ❌, and the older coloured circles) are left off the Todoist title.
+The task title is an icon plus the meal name. Breakfast, Lunch and Dinner get an icon. Dessert is not its own task: its icon and name are added to that day's dinner. A type you remove is no longer synced. FODMAP status marks at the start of the Paprika name (✅, ℹ️, ❌, and the older coloured circles) are left off the Todoist title.
 
 ```
 🍳 Sourbread French Toast
 🥗 Baked potato
-🍽️ Salmon
-🍰 Rhubarb with ice cream
+🍽️ Salmon 🍰 Rhubarb with ice cream
 ```
 
-The due date is the meal day. Tasks are labelled `meal`. The next run updates these tasks and deletes ones that have left the window or the planner.
+Breakfast is due at 9:00, lunch at 13:00 and dinner at 20:00, using the phone's local time. Dessert on the same day is added to the dinner title, and that task stays at 20:00. A dessert with no dinner is still one task at 20:00. Any other meal type stays all-day on the meal date. Tasks are labelled `meal`. The next run updates these tasks and deletes ones that have left the window or the planner.
 
 ### Profile
 
@@ -163,7 +164,7 @@ Time 7:05 AM → 7:06 AM, repeat 1 hour (same Pixel workaround as the digest).
 ### Task actions
 
 1. In **Vars**, set `%PAPRIKA_USERNAME` and `%PAPRIKA_PASSWORD` once (the Paprika account email and password). `%TODOIST_TOKEN` is the token already used by the digest.
-2. **JavaScript** — path `Download/paprika-meals.js`, or paste the file into a JavaScriptlet. Auto Exit on, timeout 90s. Save with ✓.
+2. **JavaScript** — path `Tasker/scripts/paprika-meals.js`. Auto Exit on, timeout 90s. Save with ✓.
 
 After the first successful run, add `& !@meal` to the digest HTTP query so these tasks stay out of the 9:00 list.
 

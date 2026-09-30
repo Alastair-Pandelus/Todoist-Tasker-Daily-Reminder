@@ -1,0 +1,11 @@
+---
+description: Where Tasker JavaScript files are stored on the phone
+globs: "**/*.js"
+alwaysApply: false
+---
+
+# Tasker script location
+
+File-based Tasker scripts live on the phone at `/sdcard/Tasker/scripts/`.
+
+In a JavaScript action the path is `Tasker/scripts/filename.js`. Do not put these scripts in `/sdcard/Download`. After changing a script, copy it to `/sdcard/Tasker/scripts/` on the Pixel.

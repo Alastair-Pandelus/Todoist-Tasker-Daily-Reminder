@@ -1,35 +1,29 @@
-// Waitrose geofence notify for Tasker — single JavaScriptlet.
-// Copyright (c) 2026 Alastair Pandelusstell
+// Waitrose geofence notify for Tasker.
+// Loaded from Tasker/scripts/waitrose-notify.js.
+// Copyright (c) 2026 Alastair Pandelus
 // SPDX-License-Identifier: MIT
 //
-// Fetches via XMLHttpRequest (Tasker documents this; `java` is not available).
-// AutoNotification cannot run from JS — keep it as the action after Stop.
+// Tasker's JS engine has no `java` global — do not fetch here.
+// Put an HTTP Request action BEFORE this script.
 //
 // Task order:
-//   1. This JavaScriptlet  (timeout 45s)
-//   2. If %WAITROSE_SKIP eq 1 → Stop → End If
-//   3. AutoNotification  Title %WAITROSE_TITLE  Text %WAITROSE_BODY
+//   1. HTTP Request  GET tasks?project_id=…  prefix waitrose
+//   2. Tasker/scripts/waitrose-notify.js
+//   3. If %WAITROSE_SKIP eq 1 → Stop → End If
+//   4. AutoNotification  Title %WAITROSE_TITLE  Text %WAITROSE_BODY
+//
+// After a run, check %WAITROSE_DEBUG (or the on-screen flash).
 
 var PROJECT_ID = "6hFR9RC3MvM7MQWW";
 var MAX_NAME = 40;
 var DEFAULT_TITLE = "\uD83C\uDF3F Waitrose";
 var COOLDOWN_SECS = 3600;
 
-function isBlank(v) {
-  if (v == null) return true;
-  v = String(v);
-  if (!v || v === "undefined" || v === "null") return true;
-  if (v.charAt(0) === "%") return true;
-  return false;
-}
-
 function pick(name) {
   var v;
-  try { v = local(name); } catch (e) { v = ""; }
-  if (!isBlank(v)) return String(v);
-  try { v = global(name); } catch (e2) { v = ""; }
-  if (!isBlank(v)) return String(v);
-  return "";
+  try { v = global(name); } catch (e) { return ""; }
+  if (!v || v.charAt(0) === "%") return "";
+  return String(v);
 }
 
 function clip(s, n) {
@@ -49,21 +43,6 @@ function skip(reason) {
   exit();
 }
 
-function httpGetAuth(url, token) {
-  var xhr;
-  try { xhr = new XMLHttpRequest(); } catch (e) { skip("no XHR " + e); }
-  xhr.open("GET", url, false);
-  xhr.setRequestHeader("Authorization", "Bearer " + token);
-  xhr.setRequestHeader("Accept", "application/json");
-  try { xhr.send(null); } catch (e2) { skip("http send " + e2); }
-  setGlobal("WAITROSE_HTTP_CODE", String(xhr.status));
-  var body = xhr.responseText != null ? String(xhr.responseText) : "";
-  if (xhr.status < 200 || xhr.status >= 300) {
-    skip("http " + xhr.status + " " + body.substring(0, 80));
-  }
-  return body;
-}
-
 var now = parseInt(pick("TIMES"), 10);
 var nextOk = parseInt(pick("WaitroseNextOk"), 10);
 if (!isNaN(now) && !isNaN(nextOk) && now < nextOk) {
@@ -76,15 +55,9 @@ if (homeWifi && wifi && new RegExp(homeWifi, "i").test(wifi)) {
   skip("home wifi");
 }
 
-var token = pick("TODOIST_TOKEN");
-if (!token) skip("no token");
-
-var url = "https://api.todoist.com/api/v1/tasks?project_id=" +
-  encodeURIComponent(PROJECT_ID) + "&limit=50";
-
-var raw = httpGetAuth(url, token);
+var raw = pick("waitrose_http_data") || pick("http_data");
 setGlobal("WAITROSE_HTTP_LEN", String(raw ? raw.length : 0));
-if (!raw) skip("empty http body");
+if (!raw) skip("no http body");
 
 var tasks = [];
 try {
