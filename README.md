@@ -175,6 +175,47 @@ After the first successful run, add `& !@meal` to the digest HTTP query so these
 | `%MEALS_COUNT` | Meals written |
 | `%MEALS_DEBUG` | `ok 12`, or the skip / error reason |
 
+## Nibe hot water boost
+
+[`nibe-hw-boost.js`](nibe-hw-boost.js) boosts the F1245 hot water and then turns the boost off. It uses myUplink parameter `48132` (one-time increase) and reads the tank top, `40013` (BT7). The boost ends when BT7 is above 48°C. A run with no deadline also ends after 3 hours.
+
+The 14:30 profile passes a 15:00 deadline, because electricity is only cheap until 3pm. A separate 15:00 profile turns the boost off even if the minute loop is late. Running **Nibe Hot Water Boost** by hand leaves the deadline blank, so it runs until the tank is above 48°C.
+
+It only starts while the phone is on the Fintry Wi-Fi, `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`, the same networks as **Fintry Todo**. The 14:30 profile has that Wi-Fi condition as well as the time. The script checks `%WIFII` again, so a manual run away from Fintry does nothing. If the phone leaves Fintry while a boost is running, the next minute check turns the boost off. The 3pm stop does not require Fintry Wi-Fi.
+
+The phone gets an AutoNotification when a boost starts and when it ends. The end text is the reason: the tank temperature, 3pm, leaving Fintry Wi-Fi, or the 3 hour limit. A run that never starts, including one away from Fintry, does not notify. The 3pm task stays quiet when nothing was boosted.
+
+### Credentials
+
+Set these once in Tasker **Vars**. They are not in this repository.
+
+| Variable | Purpose |
+| --- | --- |
+| `%NIBE_CLIENT_ID` | myUplink application id |
+| `%NIBE_CLIENT_SECRET` | myUplink client secret |
+
+### Profile
+
+Time 2:30 PM → 2:31 PM, repeat 1 hour (same Pixel workaround as the digest), and Wi-Fi connected to `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`. Task: **Cheap hot water**, which runs **Nibe Hot Water Boost** with parameter 1 set to `15:00`.
+
+Time 3:00 PM → 3:01 PM, repeat 1 hour. Task: **Hot water boost off**. That task always writes the boost off, including when the minute loop is still waiting. It stays quiet when a boost was not running.
+
+### Task
+
+**Nibe Hot Water Boost** can be run on its own. It keeps the device awake while it is checking.
+
+1. **JavaScript** — path `Tasker/scripts/nibe-hw-boost.js`, local `%mode` = `start`. Auto Exit on, timeout 45s.
+2. Wait 1 minute, then the same script with `%mode` = `check`, until `%NIBE_HW_ACTIVE` is `0`.
+
+| Variable | Purpose |
+| --- | --- |
+| `%NIBE_HW_ACTIVE` | `1` while a boost is running |
+| `%NIBE_HW_TEMP` | Last BT7 reading |
+| `%NIBE_HW_DEBUG` | Last status, such as `Hot water 46.2C` |
+| `%NIBE_HW_TITLE` | Notification title, `Hot water boost on` or `Hot water boost off` |
+| `%NIBE_HW_BODY` | Notification text |
+| `%NIBE_HW_NOTIFY` | `1` when the task should post that notification |
+
 ## License
 
 [MIT](LICENSE). Keep the copyright notice if you reuse or redistribute this.
