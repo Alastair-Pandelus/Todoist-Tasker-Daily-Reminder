@@ -7,13 +7,18 @@
 // Those values stay on the phone. Do not put them in this file.
 //
 // Local %mode: start (default), check, or stop.
-// Local %par1: optional deadline HH:mm, used by start. The 14:30
-// profile passes 15:00. A manual run leaves it blank and the boost
-// ends when the tank top is above 48C, or after 3 hours.
+// Local %par1: deadline HH:mm. The 14:30 profile passes 15:00.
 //
-// Start and the minute check run only while %WIFII shows a Fintry
-// SSID (the same two networks as the Fintry Todo profile). Leaving
-// Fintry cancels the boost. The 3pm stop still runs without that check.
+// One-time increase is switched on, then off when the tank top is
+// above 50C, so the lux cycle does not keep heating on the immersion.
+// It is also forced off at the deadline. A manual run has no deadline,
+// so it is forced off after 30 minutes. The boost is for a shower;
+// leaving one-time increase on after that reheats the tank once the
+// water has cooled, and that heat is not used.
+//
+// Start runs only while %WIFII shows a Fintry SSID (the same two
+// networks as the Fintry Todo profile). The 3pm stop still runs
+// without that check.
 //
 // Hot water boost is parameter 48132 (4 = one-time increase, 0 = off).
 // Tank temperature is hot water top BT7, parameter 40013.
@@ -23,8 +28,8 @@ var BOOST_ID = "48132";
 var BOOST_ON = 4;
 var BOOST_OFF = 0;
 var TEMP_ID = "40013";
-var TARGET_C = 48;
-var SAFETY_MINUTES = 180;
+var TARGET_C = 50;
+var MANUAL_MINUTES = 30;
 var FINTRY_SSIDS = ["TP-LINK_03FA_5GHz", "TP-LINK_03FA_2_4GHZ"];
 var TOKEN_URL = "https://api.myuplink.com/oauth/token";
 var API_BASE = "https://api.myuplink.com/v2/devices/" + DEVICE_ID + "/points";
@@ -107,15 +112,40 @@ function writeBoost(token, value) {
   if (xhr.status < 200 || xhr.status >= 300) fail("boost write " + xhr.status);
 }
 
-function readTemp(token) {
-  var xhr = http("GET", API_BASE + "?parameterId=" + TEMP_ID, null, authHeader(token));
-  if (xhr.status < 200 || xhr.status >= 300) return null;
-  var list;
-  try { list = JSON.parse(xhr.responseText); } catch (e) { return null; }
-  if (!list || !list.length) return null;
-  var i;
+function pointsFrom(text) {
+  var parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return null; }
+  if (!parsed) return null;
+  if (parsed.length) return parsed;
+  if (parsed.points && parsed.points.length) return parsed.points;
+  if (parsed.items && parsed.items.length) return parsed.items;
+  if (parsed.value != null) return [parsed];
+  return null;
+}
+
+function tempFrom(list) {
+  var i, point, id, value;
   for (i = 0; i < list.length; i++) {
-    if (String(list[i].parameterId) === TEMP_ID) return Number(list[i].value);
+    point = list[i];
+    id = point.parameterId;
+    if (id == null) id = point.id;
+    if (String(id) !== TEMP_ID && list.length !== 1) continue;
+    value = Number(point.value);
+    if (!isNaN(value)) return value;
+  }
+  return null;
+}
+
+function readTemp(token) {
+  var urls = [API_BASE + "/" + TEMP_ID, API_BASE];
+  var i, xhr, list, value;
+  for (i = 0; i < urls.length; i++) {
+    xhr = http("GET", urls[i], null, authHeader(token));
+    if (xhr.status < 200 || xhr.status >= 300) continue;
+    list = pointsFrom(xhr.responseText);
+    if (!list) continue;
+    value = tempFrom(list);
+    if (value !== null) return value;
   }
   return null;
 }
@@ -131,9 +161,27 @@ function atFintry() {
   return false;
 }
 
+function nowMs() {
+  return new Date().getTime();
+}
+
 function minutesNow() {
   var d = new Date();
   return d.getHours() * 60 + d.getMinutes();
+}
+
+function startedMs() {
+  var raw = parseInt(pick("NIBE_HW_STARTED"), 10);
+  if (isNaN(raw) || raw <= 0) return 0;
+  if (raw < 10000000000) return raw * 1000;
+  return raw;
+}
+
+function manualLimitReached() {
+  if (pick("NIBE_HW_DEADLINE")) return false;
+  var start = startedMs();
+  if (!start) return false;
+  return nowMs() - start >= MANUAL_MINUTES * 60 * 1000;
 }
 
 function minutesOf(hm) {
@@ -155,12 +203,12 @@ function turnOff(token, reason) {
 function startBoost() {
   if (pick("NIBE_HW_ACTIVE") === "1") {
     setGlobal("NIBE_HW_DEBUG", "boost already on");
-    return;
+    exit();
   }
   if (!atFintry()) {
     setGlobal("NIBE_HW_ACTIVE", "0");
     note("Hot water boost skipped: not on Fintry wifi");
-    return;
+    exit();
   }
   var deadline = pick("par1");
   if (minutesOf(deadline) === null) deadline = "";
@@ -170,8 +218,10 @@ function startBoost() {
   setGlobal("NIBE_HW_DEADLINE", deadline);
   setGlobal("NIBE_HW_STARTED", pick("TIMES") || String(Math.floor(new Date().getTime() / 1000)));
   setGlobal("NIBE_HW_LOOPS", "0");
+  setGlobal("NIBE_HW_CHECKED", "0");
+  setGlobal("NIBE_HW_UNREAD", "0");
   if (deadline) announce("Hot water boost on", "Until " + deadline + " or above " + TARGET_C + "C");
-  else announce("Hot water boost on", "Until above " + TARGET_C + "C");
+  else announce("Hot water boost on", "Until above " + TARGET_C + "C or " + MANUAL_MINUTES + " minutes");
 }
 
 function checkBoost() {
@@ -179,10 +229,9 @@ function checkBoost() {
     setGlobal("NIBE_HW_ACTIVE", "0");
     return;
   }
-  var loops = parseInt(pick("NIBE_HW_LOOPS"), 10);
-  if (isNaN(loops)) loops = 0;
-  loops = loops + 1;
-  setGlobal("NIBE_HW_LOOPS", String(loops));
+  var checked = parseInt(pick("NIBE_HW_CHECKED"), 10);
+  if (!isNaN(checked) && checked > 0 && nowMs() - checked < 50000) return;
+  setGlobal("NIBE_HW_CHECKED", String(nowMs()));
 
   var deadline = pick("NIBE_HW_DEADLINE");
   var deadlineMin = minutesOf(deadline);
@@ -190,21 +239,26 @@ function checkBoost() {
     turnOff(accessToken(), "Stopped at " + deadline);
     return;
   }
-  if (loops >= SAFETY_MINUTES) {
-    turnOff(accessToken(), "3 hour limit");
+  if (manualLimitReached()) {
+    turnOff(accessToken(), "Stopped after " + MANUAL_MINUTES + " minutes");
     return;
   }
-  if (!atFintry()) {
-    turnOff(accessToken(), "left Fintry wifi");
-    return;
-  }
+  switchOffIfHot();
+}
 
+function switchOffIfHot() {
   var token = accessToken();
   var temp = readTemp(token);
   if (temp === null || isNaN(temp)) {
-    note("Hot water temp unread");
+    if (pick("NIBE_HW_UNREAD") !== "1") {
+      setGlobal("NIBE_HW_UNREAD", "1");
+      note("Hot water temp unread");
+    } else {
+      setGlobal("NIBE_HW_DEBUG", "Hot water temp unread");
+    }
     return;
   }
+  setGlobal("NIBE_HW_UNREAD", "0");
   setGlobal("NIBE_HW_TEMP", String(temp));
   if (temp > TARGET_C) {
     turnOff(token, "Tank is " + temp + "C");

@@ -177,9 +177,9 @@ After the first successful run, add `& !@meal` to the digest HTTP query so these
 
 ## Nibe hot water boost
 
-[`nibe-hw-boost.js`](nibe-hw-boost.js) boosts the F1245 hot water and then turns the boost off. It uses myUplink parameter `48132` (one-time increase) and reads the tank top, `40013` (BT7). The boost ends when BT7 is above 48°C. A run with no deadline also ends after 3 hours.
+[`nibe-hw-boost.js`](nibe-hw-boost.js) boosts the F1245 hot water and then turns the boost off. It uses myUplink parameter `48132` (one-time increase) and reads the tank top, `40013` (BT7). The boost ends when BT7 is above 50°C. A manual run, which has no deadline, also ends after 30 minutes.
 
-The 14:30 profile passes a 15:00 deadline, because electricity is only cheap until 3pm. A separate 15:00 profile turns the boost off even if the minute loop is late. Running **Nibe Hot Water Boost** by hand leaves the deadline blank, so it runs until the tank is above 48°C.
+The 14:30 profile passes a 15:00 deadline, because electricity is only cheap until 3pm. A separate 15:00 profile turns the boost off even if the minute loop is late. Running **Nibe Hot Water Boost** by hand leaves the deadline blank, so it runs until the tank is above 50°C or 30 minutes have passed.
 
 It only starts while the phone is on the Fintry Wi-Fi, `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`, the same networks as **Fintry Todo**. The 14:30 profile has that Wi-Fi condition as well as the time. The script checks `%WIFII` again, so a manual run away from Fintry does nothing. If the phone leaves Fintry while a boost is running, the next minute check turns the boost off. The 3pm stop does not require Fintry Wi-Fi.
 
