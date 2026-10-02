@@ -278,6 +278,16 @@ function mealUid(task) {
 }
 
 function run() {
+  var nowDate = new Date();
+  var today = nowDate.getFullYear() + "-" +
+    ("0" + (nowDate.getMonth() + 1)).slice(-2) + "-" +
+    ("0" + nowDate.getDate()).slice(-2);
+  if (pick("MEALS_DONE") === today) {
+    setGlobal("MEALS_SKIP", "1");
+    setGlobal("MEALS_DEBUG", "already " + today);
+    exit();
+  }
+
   function show(msg) {
     try { flashLong(msg); } catch (e) { try { flash(msg); } catch (e2) {} }
     try { popup("Meals", msg, false, "", "", 30); } catch (e3) {}
@@ -491,6 +501,7 @@ function run() {
     exit();
   }
 
+  setGlobal("MEALS_DONE", today);
   setGlobal("MEALS_SKIP", "0");
   setGlobal("MEALS_DEBUG", "ok " + plans.length);
 }

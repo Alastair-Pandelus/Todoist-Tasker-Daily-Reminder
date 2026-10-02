@@ -38,10 +38,10 @@ Pictogram detection: the task title is one symbol with no letters or digits. Add
 
 Two Time profiles, both running the same task (for example `Todoist Digest`):
 
-- 9:00 AM → 9:01 AM, repeat 1 hour
-- 6:00 PM → 6:01 PM, repeat 1 hour
+- 8:00 AM → 8:10 AM, every 2 minutes
+- 6:00 PM → 6:10 PM, every 2 minutes
 
-The 1-hour repeat is a Pixel workaround so the profile still fires once in that minute.
+The 2-minute repeat is there so a wake a minute or two late still lands on a later minute. The script notifies once each morning and once each evening; a later minute in the same window does nothing.
 
 Give Tasker **Unrestricted** battery use and notification permission.
 
@@ -126,7 +126,7 @@ Tasks are labelled `weather` and marked with description `tasker-weather`, so th
 
 ### Profile
 
-Time 7:00 AM → 7:01 AM, repeat 1 hour (same Pixel workaround as the digest).
+Time 7:00 AM → 7:10 AM, every 2 minutes. A later minute in that window does nothing once that morning's forecast has been written.
 
 ### Task actions
 
@@ -159,7 +159,7 @@ Breakfast is due at 9:00, lunch at 13:00 and dinner at 20:00, using the phone's 
 
 ### Profile
 
-Time 7:05 AM → 7:06 AM, repeat 1 hour (same Pixel workaround as the digest).
+Time 7:02 AM → 7:12 AM, every 2 minutes. A later minute in that window does nothing once that morning's meals have been written.
 
 ### Task actions
 
@@ -196,9 +196,9 @@ Set these once in Tasker **Vars**. They are not in this repository.
 
 ### Profile
 
-Time 2:30 PM → 2:31 PM, repeat 1 hour (same Pixel workaround as the digest), and Wi-Fi connected to `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`. Task: **Cheap hot water**, which runs **Nibe Hot Water Boost** with parameter 1 set to `15:00`.
+Time 2:30 PM → 2:40 PM, every 2 minutes, and Wi-Fi connected to `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`. Task: **Cheap hot water**, which runs **Nibe Hot Water Boost** with parameter 1 set to `15:00`. A later minute does nothing if a boost is already running.
 
-Time 3:00 PM → 3:01 PM, repeat 1 hour. Task: **Hot water boost off**. That task always writes the boost off, including when the minute loop is still waiting. It stays quiet when a boost was not running.
+Time 3:00 PM → 3:10 PM, every 2 minutes. Task: **Hot water boost off**. That task always writes the boost off, including when the minute loop is still waiting. It stays quiet when a boost was not running.
 
 ### Task
 

@@ -41,6 +41,11 @@ function fromYmd(s) {
 }
 
 var todayStr = ymd(new Date());
+var slot = todayStr + (new Date().getHours() < 12 ? "-am" : "-pm");
+if (pick("DIGEST_DONE", true) === slot) {
+  setGlobal("MORNING_TODOIST_SKIP", "1");
+  exit();
+}
 
 function dayDiff(a, b) {
   return Math.round((fromYmd(a).getTime() - fromYmd(b).getTime()) / 86400000);
@@ -206,3 +211,4 @@ if (!out.length) {
   setGlobal("MENU_LABELS", menuLabels.join("\n"));
   setGlobal("MENU_URLS", menuUrls.join("\n"));
 }
+if (raw) setGlobal("DIGEST_DONE", slot);

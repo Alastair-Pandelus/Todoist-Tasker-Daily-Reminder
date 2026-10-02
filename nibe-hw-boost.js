@@ -153,6 +153,10 @@ function turnOff(token, reason) {
 }
 
 function startBoost() {
+  if (pick("NIBE_HW_ACTIVE") === "1") {
+    setGlobal("NIBE_HW_DEBUG", "boost already on");
+    return;
+  }
   if (!atFintry()) {
     setGlobal("NIBE_HW_ACTIVE", "0");
     note("Hot water boost skipped: not on Fintry wifi");

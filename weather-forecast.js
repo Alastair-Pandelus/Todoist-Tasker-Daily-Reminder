@@ -182,6 +182,16 @@ function unchanged(task, plan) {
 }
 
 function run() {
+  var nowDate = new Date();
+  var today = nowDate.getFullYear() + "-" +
+    ("0" + (nowDate.getMonth() + 1)).slice(-2) + "-" +
+    ("0" + nowDate.getDate()).slice(-2);
+  if (pick("WEATHER_DONE") === today) {
+    setGlobal("WEATHER_SKIP", "1");
+    setGlobal("WEATHER_DEBUG", "already " + today);
+    exit();
+  }
+
   function fail(reason) {
     setGlobal("WEATHER_SKIP", "1");
     setGlobal("WEATHER_DEBUG", reason);
@@ -314,6 +324,7 @@ function run() {
     exit();
   }
 
+  setGlobal("WEATHER_DONE", today);
   setGlobal("WEATHER_SKIP", "0");
   setGlobal("WEATHER_DEBUG", "ok " + plans.length);
   try { flash("Weather " + plans.length + " days"); } catch (e6) {}
