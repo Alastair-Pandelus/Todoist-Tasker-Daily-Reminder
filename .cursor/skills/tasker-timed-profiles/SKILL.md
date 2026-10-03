@@ -50,3 +50,5 @@ Set the done flag only after the run succeeds, so a failed first minute can try 
 | Hot water boost off | 15:00–15:10 | The stop task stays quiet when the boost was not running |
 
 A hot-water start that is already active returns without a second notification. The 3pm stop may run more than once; it does not notify when the boost is already off.
+
+Fintry Wi-Fi is `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`. The same three networks are on the **Fintry Todo** and **Cheap hot water** profiles.

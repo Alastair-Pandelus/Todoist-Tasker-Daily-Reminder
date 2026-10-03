@@ -16,8 +16,8 @@
 // leaving one-time increase on after that reheats the tank once the
 // water has cooled, and that heat is not used.
 //
-// Start runs only while %WIFII shows a Fintry SSID (the same two
-// networks as the Fintry Todo profile), and only if the Todoist task
+// Start runs only while %WIFII shows a Fintry SSID (the same networks
+// as the Fintry Todo profile), and only if the Todoist task
 // "Boost hot water for shower" is still open and due at 14:30 today.
 // The 3pm stop still runs without those checks.
 //
@@ -33,7 +33,7 @@ var TARGET_C = 50;
 var MANUAL_MINUTES = 30;
 var SHOWER_TASK = "\u2668\uFE0F Boost hot water for shower";
 var TODOIST_FILTER = "https://api.todoist.com/api/v1/tasks/filter";
-var FINTRY_SSIDS = ["TP-LINK_03FA_5GHz", "TP-LINK_03FA_2_4GHZ"];
+var FINTRY_SSIDS = ["TP-LINK_03FA_5GHz", "TP-LINK_03FA_2_4GHZ", "oldmanse"];
 var TOKEN_URL = "https://api.myuplink.com/oauth/token";
 var API_BASE = "https://api.myuplink.com/v2/devices/" + DEVICE_ID + "/points";
 
