@@ -46,7 +46,7 @@ Set the done flag only after the run succeeds, so a failed first minute can try 
 | Paprika Meals | 7:02–7:12 | `%MEALS_DONE` is today's date |
 | Todoist AM | 8:00–8:10 | `%DIGEST_DONE` is `yyyy-mm-dd-am` |
 | Todoist PM | 18:00–18:10 | `%DIGEST_DONE` is `yyyy-mm-dd-pm` |
-| Cheap hot water | 14:30–14:40, Fintry Wi-Fi | `%NIBE_HW_ACTIVE` is already `1` |
+| Cheap hot water | 14:30–14:40, Fintry Wi-Fi, open Todoist task "♨️ Boost hot water for shower" due 14:30 today | `%NIBE_HW_ACTIVE` is already `1` |
 | Hot water boost off | 15:00–15:10 | The stop task stays quiet when the boost was not running |
 
 A hot-water start that is already active returns without a second notification. The 3pm stop may run more than once; it does not notify when the boost is already off.

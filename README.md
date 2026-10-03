@@ -181,7 +181,7 @@ After the first successful run, add `& !@meal` to the digest HTTP query so these
 
 The 14:30 profile passes a 15:00 deadline, because electricity is only cheap until 3pm. A separate 15:00 profile turns the boost off even if the minute loop is late. Running **Nibe Hot Water Boost** by hand leaves the deadline blank, so it runs until the tank is above 50°C or 30 minutes have passed.
 
-It only starts while the phone is on the Fintry Wi-Fi, `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`, the same networks as **Fintry Todo**. The 14:30 profile has that Wi-Fi condition as well as the time. The script checks `%WIFII` again, so a manual run away from Fintry does nothing. If the phone leaves Fintry while a boost is running, the next minute check turns the boost off. The 3pm stop does not require Fintry Wi-Fi.
+It only starts while the Todoist task **♨️ Boost hot water for shower** is still open and due at 2:30pm that day, and the phone is on the Fintry Wi-Fi, `TP-LINK_03FA_5GHz` or `TP-LINK_03FA_2_4GHZ`, the same networks as **Fintry Todo**. The 14:30 profile has that Wi-Fi condition as well as the time. The script checks `%WIFII` again, so a manual run away from Fintry does nothing. If the phone leaves Fintry while a boost is running, the next minute check turns the boost off. The 3pm stop does not require Fintry Wi-Fi.
 
 The phone gets an AutoNotification when a boost starts and when it ends. The end text is the reason: the tank temperature, 3pm, leaving Fintry Wi-Fi, or the 3 hour limit. A run that never starts, including one away from Fintry, does not notify. The 3pm task stays quiet when nothing was boosted.
 

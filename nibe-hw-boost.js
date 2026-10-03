@@ -17,8 +17,9 @@
 // water has cooled, and that heat is not used.
 //
 // Start runs only while %WIFII shows a Fintry SSID (the same two
-// networks as the Fintry Todo profile). The 3pm stop still runs
-// without that check.
+// networks as the Fintry Todo profile), and only if the Todoist task
+// "Boost hot water for shower" is still open and due at 14:30 today.
+// The 3pm stop still runs without those checks.
 //
 // Hot water boost is parameter 48132 (4 = one-time increase, 0 = off).
 // Tank temperature is hot water top BT7, parameter 40013.
@@ -30,6 +31,8 @@ var BOOST_OFF = 0;
 var TEMP_ID = "40013";
 var TARGET_C = 50;
 var MANUAL_MINUTES = 30;
+var SHOWER_TASK = "\u2668\uFE0F Boost hot water for shower";
+var TODOIST_FILTER = "https://api.todoist.com/api/v1/tasks/filter";
 var FINTRY_SSIDS = ["TP-LINK_03FA_5GHz", "TP-LINK_03FA_2_4GHZ"];
 var TOKEN_URL = "https://api.myuplink.com/oauth/token";
 var API_BASE = "https://api.myuplink.com/v2/devices/" + DEVICE_ID + "/points";
@@ -150,6 +153,70 @@ function readTemp(token) {
   return null;
 }
 
+function ymd(d) {
+  return d.getFullYear() + "-" +
+    ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
+    ("0" + d.getDate()).slice(-2);
+}
+
+function dueIsTodayAt1430(dateStr) {
+  if (!dateStr) return false;
+  dateStr = String(dateStr);
+  var today = ymd(new Date());
+  var z = dateStr.charAt(dateStr.length - 1) === "Z" || dateStr.indexOf("+") >= 0;
+  if (z) {
+    var parsed = new Date(dateStr);
+    if (isNaN(parsed.getTime())) return false;
+    return ymd(parsed) === today && parsed.getHours() === 14 && parsed.getMinutes() === 30;
+  }
+  return dateStr.substring(0, 10) === today && dateStr.substring(11, 16) === "14:30";
+}
+
+function dueString(task) {
+  if (!task) return "";
+  if (task.due) {
+    if (task.due.datetime) return String(task.due.datetime);
+    if (task.due.date) return String(task.due.date);
+  }
+  if (task.dueDate) return String(task.dueDate);
+  return "";
+}
+
+function showerDueToday(task) {
+  var dateStr = dueString(task);
+  if (dueIsTodayAt1430(dateStr)) return true;
+  if (dateStr.substring(0, 10) !== ymd(new Date())) return false;
+  if (dateStr.indexOf("T") >= 0) return false;
+  var hint = "";
+  if (task.due && task.due.string) hint = String(task.due.string);
+  else if (task.recurring) hint = String(task.recurring);
+  return hint.indexOf("2:30") >= 0 || hint.indexOf("14:30") >= 0;
+}
+
+function showerTaskOpen() {
+  var token = pick("TODOIST_TOKEN");
+  if (!token) return "no todoist token";
+  var query = "today & search: Boost hot water for shower";
+  var url = TODOIST_FILTER + "?query=" + encodeURIComponent(query) + "&limit=50";
+  var xhr = http("GET", url, null, {
+    Authorization: "Bearer " + token,
+    Accept: "application/json"
+  });
+  if (xhr.status < 200 || xhr.status >= 300) return "todoist " + xhr.status;
+  var parsed;
+  try { parsed = JSON.parse(xhr.responseText); } catch (e) { return "todoist json"; }
+  var list = parsed && parsed.results ? parsed.results : [];
+  var i, task;
+  for (i = 0; i < list.length; i++) {
+    task = list[i];
+    if (!task || !task.content) continue;
+    if (task.content !== SHOWER_TASK && task.content.indexOf("Boost hot water for shower") < 0) continue;
+    if (task.checked || task.is_completed) continue;
+    if (showerDueToday(task)) return "";
+  }
+  return "no open 2:30 shower task";
+}
+
 function atFintry() {
   var wifi = pick("WIFII");
   var conn = wifi.split(">>> SCAN")[0];
@@ -203,6 +270,18 @@ function turnOff(token, reason) {
 function startBoost() {
   if (pick("NIBE_HW_ACTIVE") === "1") {
     setGlobal("NIBE_HW_DEBUG", "boost already on");
+    exit();
+  }
+  var shower = showerTaskOpen();
+  if (shower) {
+    setGlobal("NIBE_HW_ACTIVE", "0");
+    var skipKey = ymd(new Date()) + "|" + shower;
+    if (pick("NIBE_HW_SKIP") === skipKey) {
+      setGlobal("NIBE_HW_DEBUG", shower);
+      exit();
+    }
+    setGlobal("NIBE_HW_SKIP", skipKey);
+    note("Hot water boost skipped: " + shower);
     exit();
   }
   if (!atFintry()) {
