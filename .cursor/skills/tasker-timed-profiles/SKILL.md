@@ -46,9 +46,9 @@ Set the done flag only after the run succeeds, so a failed first minute can try 
 | Paprika Meals | 7:02–7:12 | `%MEALS_DONE` is today's date |
 | Todoist AM | 8:00–8:10 | `%DIGEST_DONE` is `yyyy-mm-dd-am` |
 | Todoist PM | 18:00–18:10 | `%DIGEST_DONE` is `yyyy-mm-dd-pm` |
-| Cheap hot water | 14:30–14:40, Fintry Wi-Fi, open Todoist task "♨️ Boost hot water for shower" due 14:30 today | `%NIBE_HW_ACTIVE` is already `1` |
+| Cheap hot water | 14:30–14:40, Fintry Wi-Fi or (no Wi-Fi and within 200m of the house), open Todoist task "♨️ Boost hot water for shower" due 14:30 today | `%NIBE_HW_ACTIVE` is already `1` |
 | Hot water boost off | 15:00–15:10 | The stop task stays quiet when the boost was not running |
 
 A hot-water start that is already active returns without a second notification. The 3pm stop may run more than once; it does not notify when the boost is already off.
 
-Fintry Wi-Fi is `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`. The same three networks are on the **Fintry Todo** and **Cheap hot water** profiles.
+Fintry Wi-Fi is `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`. The same three networks are on the **Fintry Todo** and **Cheap hot water** profiles. When the phone is not on any Wi-Fi, a fix within 200m of the house (`56.04972`, `-4.20715`) also counts, via **Fintry garden** and **Cheap hot water garden**. Another Wi-Fi network does not.

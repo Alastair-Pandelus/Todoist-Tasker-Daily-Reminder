@@ -16,10 +16,12 @@
 // leaving one-time increase on after that reheats the tank once the
 // water has cooled, and that heat is not used.
 //
-// Start runs only while %WIFII shows a Fintry SSID (the same networks
-// as the Fintry Todo profile), and only if the Todoist task
+// Start runs only at Fintry, and only if the Todoist task
 // "Boost hot water for shower" is still open and due at 14:30 today.
-// The 3pm stop still runs without those checks.
+// Fintry Wi-Fi (the same networks as the Fintry Todo profile) counts.
+// If the phone is not on any Wi-Fi, a location fix within 200m of the
+// house counts instead, so the garden still starts a boost. A different
+// Wi-Fi network does not. The 3pm stop still runs without those checks.
 //
 // If the boiler cannot be reached, or the API key is rejected, the
 // phone gets one notification and a running boost is switched off.
@@ -37,6 +39,9 @@ var MANUAL_MINUTES = 30;
 var SHOWER_TASK = "\u2668\uFE0F Boost hot water for shower";
 var TODOIST_FILTER = "https://api.todoist.com/api/v1/tasks/filter";
 var FINTRY_SSIDS = ["TP-LINK_03FA_5GHz", "TP-LINK_03FA_2_4GHZ", "oldmanse"];
+var FINTRY_LAT = 56.04972;
+var FINTRY_LON = -4.20715;
+var FINTRY_RADIUS_M = 200;
 var TOKEN_URL = "https://api.myuplink.com/oauth/token";
 var API_BASE = "https://api.myuplink.com/v2/devices/" + DEVICE_ID + "/points";
 
@@ -296,15 +301,46 @@ function showerTaskOpen() {
   return "no open 2:30 shower task";
 }
 
+function metresBetween(lat1, lon1, lat2, lon2) {
+  var radius = 6371000;
+  var p = Math.PI / 180;
+  var dLat = (lat2 - lat1) * p;
+  var dLon = (lon2 - lon1) * p;
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * p) * Math.cos(lat2 * p) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 2 * radius * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function nearFintry() {
+  var loc = pick("LOC");
+  var parts = loc.split(",");
+  if (parts.length < 2) return false;
+  var lat = parseFloat(parts[0]);
+  var lon = parseFloat(parts[1]);
+  if (isNaN(lat) || isNaN(lon)) return false;
+  return metresBetween(lat, lon, FINTRY_LAT, FINTRY_LON) <= FINTRY_RADIUS_M;
+}
+
+function otherWifi(conn) {
+  var ssidAt = conn.indexOf("SSID:");
+  if (ssidAt < 0) return false;
+  var line = conn.substring(ssidAt, ssidAt + 80).toLowerCase();
+  if (line.indexOf("unknown") >= 0) return false;
+  if (line.indexOf("not connected") >= 0) return false;
+  if (line.indexOf("<none>") >= 0) return false;
+  return true;
+}
+
 function atFintry() {
   var wifi = pick("WIFII");
   var conn = wifi.split(">>> SCAN")[0];
-  if (conn.indexOf("CONNECTION") < 0) return false;
   var i;
   for (i = 0; i < FINTRY_SSIDS.length; i++) {
     if (conn.indexOf(FINTRY_SSIDS[i]) >= 0) return true;
   }
-  return false;
+  if (otherWifi(conn)) return false;
+  return nearFintry();
 }
 
 function nowMs() {
@@ -365,7 +401,7 @@ function startBoost() {
   }
   if (!atFintry()) {
     setGlobal("NIBE_HW_ACTIVE", "0");
-    note("Hot water boost skipped: not on Fintry wifi");
+    note("Hot water boost skipped: not at Fintry");
     exit();
   }
   var deadline = pick("par1");

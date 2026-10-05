@@ -181,9 +181,9 @@ After the first successful run, add `& !@meal` to the digest HTTP query so these
 
 The 14:30 profile passes a 15:00 deadline, because electricity is only cheap until 3pm. A separate 15:00 profile turns the boost off even if the minute loop is late. Running **Nibe Hot Water Boost** by hand leaves the deadline blank, so it runs until the tank is above 50°C or 30 minutes have passed.
 
-It only starts while the Todoist task **♨️ Boost hot water for shower** is still open and due at 2:30pm that day, and the phone is on the Fintry Wi-Fi, `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`, the same networks as **Fintry Todo**. The 14:30 profile has that Wi-Fi condition as well as the time. The script checks `%WIFII` again, so a manual run away from Fintry does nothing. If the phone leaves Fintry while a boost is running, the next minute check turns the boost off. The 3pm stop does not require Fintry Wi-Fi.
+It only starts while the Todoist task **♨️ Boost hot water for shower** is still open and due at 2:30pm that day, and the phone is at Fintry. Fintry Wi-Fi is `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`, the same networks as **Fintry Todo**. If the phone is not joined to any Wi-Fi, a location fix within 200m of the house (`56.04972`, `-4.20715`) counts instead, which covers the garden. Joined to any other network, it does not start. The 3pm stop does not require Fintry.
 
-The phone gets an AutoNotification when a boost starts and when it ends. The end text is the reason: the tank temperature, 3pm, leaving Fintry Wi-Fi, or the 3 hour limit. If the boiler cannot be reached, or the API key is rejected, the phone gets one error notification and a running boost is switched off. A run that never starts, including one away from Fintry, does not notify. The 3pm task stays quiet when nothing was boosted.
+The phone gets an AutoNotification when a boost starts and when it ends. The end text is the reason: the tank temperature, 3pm, or 30 minutes on a manual run. If the boiler cannot be reached, or the API key is rejected, the phone gets one error notification and a running boost is switched off. A run that never starts, including one away from Fintry, does not notify. The 3pm task stays quiet when nothing was boosted.
 
 ### Credentials
 
@@ -196,7 +196,7 @@ Set these once in Tasker **Vars**. They are not in this repository.
 
 ### Profile
 
-Time 2:30 PM → 2:40 PM, every 2 minutes, and Wi-Fi connected to `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`. Task: **Cheap hot water**, which runs **Nibe Hot Water Boost** with parameter 1 set to `15:00`. A later minute does nothing if a boost is already running.
+Time 2:30 PM → 2:40 PM, every 2 minutes, and either Wi-Fi connected to `TP-LINK_03FA_5GHz`, `TP-LINK_03FA_2_4GHZ`, or `oldmanse`, or not connected to any Wi-Fi and inside 200m of the house. Those are two profiles, **Cheap hot water** and **Cheap hot water garden**, and both run **Nibe Hot Water Boost** with parameter 1 set to `15:00`. A later minute does nothing if a boost is already running. **Fintry garden** is the same location backup for **Fintry Todo**: inside that 200m, and not on any Wi-Fi.
 
 Time 3:00 PM → 3:10 PM, every 2 minutes. Task: **Hot water boost off**. That task always writes the boost off, including when the minute loop is still waiting. It stays quiet when a boost was not running.
 
