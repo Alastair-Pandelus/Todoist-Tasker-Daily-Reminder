@@ -21,6 +21,9 @@
 // "Boost hot water for shower" is still open and due at 14:30 today.
 // The 3pm stop still runs without those checks.
 //
+// If the boiler cannot be reached, or the API key is rejected, the
+// phone gets one notification and a running boost is switched off.
+//
 // Hot water boost is parameter 48132 (4 = one-time increase, 0 = off).
 // Tank temperature is hot water top BT7, parameter 40013.
 
@@ -66,53 +69,121 @@ function announce(title, body) {
   note(title + ": " + body);
 }
 
-function fail(msg) {
+function quietHttp(method, url, body, headers) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, url, false);
+    var key;
+    for (key in headers) {
+      if (headers.hasOwnProperty(key)) xhr.setRequestHeader(key, headers[key]);
+    }
+    if (body == null) xhr.send("");
+    else xhr.send(body);
+    return xhr;
+  } catch (e) {
+    return null;
+  }
+}
+
+function quietToken() {
+  var id = pick("NIBE_CLIENT_ID");
+  var secret = pick("NIBE_CLIENT_SECRET");
+  if (!id || !secret) return "";
+  var body = "grant_type=client_credentials" +
+    "&client_id=" + encodeURIComponent(id) +
+    "&client_secret=" + encodeURIComponent(secret) +
+    "&scope=" + encodeURIComponent("READSYSTEM WRITESYSTEM");
+  var xhr = quietHttp("POST", TOKEN_URL, body, {
+    "Content-Type": "application/x-www-form-urlencoded"
+  });
+  if (!xhr || xhr.status < 200 || xhr.status >= 300) return "";
+  try {
+    var parsed = JSON.parse(xhr.responseText);
+    if (parsed && parsed.access_token) return parsed.access_token;
+  } catch (e) {}
+  return "";
+}
+
+function quietWriteOff(token) {
+  var xhr = quietHttp("PATCH", API_BASE, "{\"" + BOOST_ID + "\":" + BOOST_OFF + "}", {
+    Authorization: "Bearer " + token,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "Accept-Language": "en-GB"
+  });
+  return !!(xhr && xhr.status >= 200 && xhr.status < 300);
+}
+
+function boilerError(msg) {
+  var wasOn = pick("NIBE_HW_ACTIVE") === "1";
+  var switched = false;
+  if (wasOn) {
+    var token = quietToken();
+    if (token) switched = quietWriteOff(token);
+  }
   setGlobal("NIBE_HW_ACTIVE", "0");
-  note(msg);
+  setGlobal("NIBE_HW_DEADLINE", "");
+  var body = msg;
+  if (wasOn) body += switched ? " Boost switched off." : " Boost could not be switched off.";
+  else body += " Boost not started.";
+  var key = ymd(new Date()) + "|" + body;
+  if (pick("NIBE_HW_ERROR") === key) {
+    setGlobal("NIBE_HW_DEBUG", body);
+    exit();
+  }
+  setGlobal("NIBE_HW_ERROR", key);
+  announce("Hot water boost error", body);
   exit();
 }
 
 function http(method, url, body, headers) {
-  var xhr;
-  try { xhr = new XMLHttpRequest(); } catch (e) { fail("no XHR " + e); }
-  xhr.open(method, url, false);
-  var key;
-  for (key in headers) {
-    if (headers.hasOwnProperty(key)) xhr.setRequestHeader(key, headers[key]);
-  }
-  try { xhr.send(body); } catch (e2) { fail(method + " " + e2); }
+  return quietHttp(method, url, body, headers);
+}
+
+function boilerHttp(method, url, body, headers) {
+  var xhr = quietHttp(method, url, body, headers);
+  if (!xhr) boilerError("Cannot reach the boiler.");
   return xhr;
 }
 
 function accessToken() {
   var id = pick("NIBE_CLIENT_ID");
   var secret = pick("NIBE_CLIENT_SECRET");
-  if (!id || !secret) fail("Nibe credentials missing");
+  if (!id || !secret) boilerError("API key missing.");
   var body = "grant_type=client_credentials" +
     "&client_id=" + encodeURIComponent(id) +
     "&client_secret=" + encodeURIComponent(secret) +
     "&scope=" + encodeURIComponent("READSYSTEM WRITESYSTEM");
-  var xhr = http("POST", TOKEN_URL, body, {
+  var xhr = boilerHttp("POST", TOKEN_URL, body, {
     "Content-Type": "application/x-www-form-urlencoded"
   });
-  if (xhr.status < 200 || xhr.status >= 300) fail("token " + xhr.status);
+  if (xhr.status === 400 || xhr.status === 401 || xhr.status === 403) boilerError("API key invalid.");
+  if (xhr.status < 200 || xhr.status >= 300) boilerError("Boiler login failed (" + xhr.status + ").");
   var parsed;
-  try { parsed = JSON.parse(xhr.responseText); } catch (e) { fail("token json"); }
-  if (!parsed || !parsed.access_token) fail("token empty");
+  try { parsed = JSON.parse(xhr.responseText); } catch (e) { boilerError("Boiler login reply was not readable."); }
+  if (!parsed || !parsed.access_token) boilerError("Boiler login did not return a key.");
   return parsed.access_token;
 }
 
 function authHeader(token) {
-  return { Authorization: "Bearer " + token, Accept: "application/json" };
+  // Tasker sends an Accept-Language the API rejects, which made every
+  // temperature read fail. en-GB is a locale it accepts.
+  return {
+    Authorization: "Bearer " + token,
+    Accept: "application/json",
+    "Accept-Language": "en-GB"
+  };
 }
 
 function writeBoost(token, value) {
-  var xhr = http("PATCH", API_BASE, "{\"" + BOOST_ID + "\":" + value + "}", {
+  var xhr = boilerHttp("PATCH", API_BASE, "{\"" + BOOST_ID + "\":" + value + "}", {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
-    Accept: "application/json"
+    Accept: "application/json",
+    "Accept-Language": "en-GB"
   });
-  if (xhr.status < 200 || xhr.status >= 300) fail("boost write " + xhr.status);
+  if (xhr.status === 401 || xhr.status === 403) boilerError("API key invalid.");
+  if (xhr.status < 200 || xhr.status >= 300) boilerError("Boost switch failed (" + xhr.status + ").");
 }
 
 function pointsFrom(text) {
@@ -139,12 +210,19 @@ function tempFrom(list) {
   return null;
 }
 
+var readTempStatus = 0;
+
 function readTemp(token) {
-  var urls = [API_BASE + "/" + TEMP_ID, API_BASE];
+  var urls = [API_BASE + "?parameterId=" + TEMP_ID, API_BASE];
   var i, xhr, list, value;
+  readTempStatus = 0;
   for (i = 0; i < urls.length; i++) {
-    xhr = http("GET", urls[i], null, authHeader(token));
-    if (xhr.status < 200 || xhr.status >= 300) continue;
+    xhr = boilerHttp("GET", urls[i], null, authHeader(token));
+    if (xhr.status === 401 || xhr.status === 403) boilerError("API key invalid.");
+    if (xhr.status < 200 || xhr.status >= 300) {
+      readTempStatus = xhr.status;
+      continue;
+    }
     list = pointsFrom(xhr.responseText);
     if (!list) continue;
     value = tempFrom(list);
@@ -202,6 +280,7 @@ function showerTaskOpen() {
     Authorization: "Bearer " + token,
     Accept: "application/json"
   });
+  if (!xhr) return "todoist unreachable";
   if (xhr.status < 200 || xhr.status >= 300) return "todoist " + xhr.status;
   var parsed;
   try { parsed = JSON.parse(xhr.responseText); } catch (e) { return "todoist json"; }
@@ -329,13 +408,8 @@ function switchOffIfHot() {
   var token = accessToken();
   var temp = readTemp(token);
   if (temp === null || isNaN(temp)) {
-    if (pick("NIBE_HW_UNREAD") !== "1") {
-      setGlobal("NIBE_HW_UNREAD", "1");
-      note("Hot water temp unread");
-    } else {
-      setGlobal("NIBE_HW_DEBUG", "Hot water temp unread");
-    }
-    return;
+    if (readTempStatus) boilerError("Tank temperature request failed (" + readTempStatus + ").");
+    boilerError("Tank temperature was not returned.");
   }
   setGlobal("NIBE_HW_UNREAD", "0");
   setGlobal("NIBE_HW_TEMP", String(temp));
