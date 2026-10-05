@@ -7,7 +7,9 @@
 // without the FODMAP status mark Paprika puts at the start of the recipe.
 // Breakfast, Lunch and Dinner get an icon. Breakfast is due at 9:00
 // for 30 minutes, lunch at 13:00 for 45 minutes and dinner at 20:00
-// for 45 minutes, in the phone's local time.
+// for 45 minutes, in the phone's local time. Each breakfast is followed
+// by a separate 15-minute priority-1 task at 9:30,
+// 🧊 Prep Lunch & Dinner.
 // Dessert on the same day is added onto the dinner title, and that
 // task stays at 20:00. A lunchtime snack (hummus, oatcakes with cheese)
 // is added onto that day's lunch main, and that task stays at 13:00.
@@ -18,6 +20,11 @@
 
 var LABEL = "meal";
 var MARKER = "tasker-paprika:";
+var PREP_CONTENT = "\uD83E\uDDCA Prep Lunch & Dinner";
+var PREP_NOTE = "Take anything out of the freezer for lunch and dinner. Move it to the fridge if it needs the day to defrost.";
+var PREP_TIME = "09:30";
+var PREP_MINUTES = 15;
+var PREP_PRIORITY = 4;
 var API = "https://paprikaapp.com/api";
 
 function isBlank(v) {
@@ -266,8 +273,22 @@ function dueFields(plan) {
 function mealMinutes(plan) {
   if (!plan || !plan.time) return 0;
   if (plan.time === "09:00") return 30;
+  if (plan.time === PREP_TIME) return PREP_MINUTES;
   if (plan.time === "13:00" || plan.time === "20:00") return 45;
   return 0;
+}
+
+function isPrepTask(task) {
+  return !!(task && task.content === PREP_CONTENT);
+}
+
+function taskDay(task) {
+  var raw = dueRaw(task);
+  if (!raw) return "";
+  if (raw.indexOf("T") < 0) return raw.substring(0, 10);
+  var parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) return raw.substring(0, 10);
+  return ymd(parsed);
 }
 
 function durationAmount(task) {
@@ -464,33 +485,39 @@ function run() {
   }
 
   var byUid = {};
+  var prepByDate = {};
   for (i = 0; i < existing.length; i++) {
     var task = existing[i];
     if (!task || task.checked || task.is_completed) continue;
+    if (isPrepTask(task)) {
+      var prepDay = taskDay(task);
+      if (!prepDay) continue;
+      if (!prepByDate[prepDay]) prepByDate[prepDay] = [];
+      prepByDate[prepDay].push(task);
+      continue;
+    }
     var uid = mealUid(task);
     if (!uid) continue;
     if (!byUid[uid]) byUid[uid] = [];
     byUid[uid].push(task);
   }
 
-  var wanted = {};
-  var errors = [];
-  var p;
-  for (p = 0; p < plans.length; p++) {
-    var plan = plans[p];
-    wanted[plan.uid] = true;
-    var group = byUid[plan.uid] || [];
+  function writeTask(plan, group, note, priority) {
     var minutes = mealMinutes(plan);
+    var description = note || (MARKER + plan.uid);
     var same = group.length &&
       group[0].content === plan.content &&
       sameDue(group[0], plan) &&
       hasLabel(group[0]) &&
-      durationAmount(group[0]) === minutes;
+      durationAmount(group[0]) === minutes &&
+      String(group[0].description || "") === description &&
+      (!priority || parseInt(group[0].priority, 10) === priority);
     var payload = {
       content: plan.content,
-      description: MARKER + plan.uid,
+      description: description,
       labels: [LABEL]
     };
+    if (priority) payload.priority = priority;
     var due = dueFields(plan);
     var dueKey;
     for (dueKey in due) {
@@ -510,6 +537,34 @@ function run() {
     for (i = 1; i < group.length; i++) {
       var extra = http("DELETE", "https://api.todoist.com/api/v1/tasks/" + encodeURIComponent(group[i].id), null, auth);
       if (extra.status < 200 || extra.status >= 300) errors.push("dup " + extra.status);
+    }
+  }
+
+  var wanted = {};
+  var wantedPrep = {};
+  var errors = [];
+  var p;
+  for (p = 0; p < plans.length; p++) {
+    var plan = plans[p];
+    wanted[plan.uid] = true;
+    writeTask(plan, byUid[plan.uid] || [], "");
+    if (plan.time !== "09:00" || wantedPrep[plan.date]) continue;
+    wantedPrep[plan.date] = true;
+    writeTask({
+      date: plan.date,
+      time: PREP_TIME,
+      content: PREP_CONTENT,
+      uid: "prep"
+    }, prepByDate[plan.date] || [], PREP_NOTE, PREP_PRIORITY);
+  }
+
+  var prepDate;
+  for (prepDate in prepByDate) {
+    if (!prepByDate.hasOwnProperty(prepDate) || wantedPrep[prepDate]) continue;
+    var oldPrep = prepByDate[prepDate];
+    for (i = 0; i < oldPrep.length; i++) {
+      var dropPrep = http("DELETE", "https://api.todoist.com/api/v1/tasks/" + encodeURIComponent(oldPrep[i].id), null, auth);
+      if (dropPrep.status < 200 || dropPrep.status >= 300) errors.push("prep " + dropPrep.status);
     }
   }
 

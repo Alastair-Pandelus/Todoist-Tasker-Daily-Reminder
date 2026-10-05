@@ -155,7 +155,7 @@ The task title is an icon plus the meal name. Breakfast, Lunch and Dinner get an
 🍽️ Salmon 🍰 Rhubarb with ice cream
 ```
 
-Breakfast is due at 9:00 for 30 minutes, lunch at 13:00 for 45 minutes and dinner at 20:00 for 45 minutes, using the phone's local time. Dessert on the same day is added to the dinner title, and that task stays at 20:00. A dessert with no dinner is still one task at 20:00. Any other meal type stays all-day on the meal date. Tasks are labelled `meal`. The next run updates these tasks and deletes ones that have left the window or the planner.
+Breakfast is due at 9:00 for 30 minutes, lunch at 13:00 for 45 minutes and dinner at 20:00 for 45 minutes, using the phone's local time. Immediately after each breakfast, a separate 15-minute priority-1 task at 9:30 is titled 🧊 Prep Lunch & Dinner. Its note says to take anything for lunch and dinner out of the freezer, and to move it to the fridge if it needs the day to defrost. Dessert on the same day is added to the dinner title, and that task stays at 20:00. A dessert with no dinner is still one task at 20:00. Any other meal type stays all-day on the meal date. Tasks are labelled `meal`. The next run updates these tasks and deletes ones that have left the window or the planner.
 
 ### Profile
 
