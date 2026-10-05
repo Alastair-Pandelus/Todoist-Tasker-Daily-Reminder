@@ -5,8 +5,9 @@
 // Daily profile. Copies scheduled meals from today through the same
 // date next month. The Todoist title is an icon plus the meal name,
 // without the FODMAP status mark Paprika puts at the start of the recipe.
-// Breakfast, Lunch and Dinner get an icon. Breakfast is due at 9:00,
-// lunch at 13:00 and dinner at 20:00 in the phone's local time.
+// Breakfast, Lunch and Dinner get an icon. Breakfast is due at 9:00
+// for 30 minutes, lunch at 13:00 for 45 minutes and dinner at 20:00
+// for 45 minutes, in the phone's local time.
 // Dessert on the same day is added onto the dinner title, and that
 // task stays at 20:00. A lunchtime snack (hummus, oatcakes with cheese)
 // is added onto that day's lunch main, and that task stays at 13:00.
@@ -262,6 +263,29 @@ function dueFields(plan) {
   return { due_date: plan.date };
 }
 
+function mealMinutes(plan) {
+  if (!plan || !plan.time) return 0;
+  if (plan.time === "09:00") return 30;
+  if (plan.time === "13:00" || plan.time === "20:00") return 45;
+  return 0;
+}
+
+function durationAmount(task) {
+  if (!task || task.duration == null || task.duration === "") return 0;
+  var amount;
+  var unit;
+  if (typeof task.duration === "object") {
+    amount = parseInt(task.duration.amount, 10);
+    unit = task.duration.unit ? String(task.duration.unit) : "minute";
+  } else {
+    amount = parseInt(task.duration, 10);
+    unit = task.duration_unit ? String(task.duration_unit) : "minute";
+  }
+  if (isNaN(amount)) return 0;
+  if (unit !== "minute") return -1;
+  return amount;
+}
+
 function hasLabel(task) {
   var labels = task.labels || [];
   var i;
@@ -368,9 +392,8 @@ function run() {
   }
 
   var mealRows = parseResult(http("GET", API + "/v2/sync/meals/", null, paprikaAuth), "meals");
-  var today = new Date();
-  var start = ymd(today);
-  var end = ymd(addMonths(today, 1));
+  var start = ymd(nowDate);
+  var end = ymd(addMonths(nowDate, 1));
   var plans = [];
   for (i = 0; i < (mealRows || []).length; i++) {
     var meal = mealRows[i];
@@ -457,10 +480,12 @@ function run() {
     var plan = plans[p];
     wanted[plan.uid] = true;
     var group = byUid[plan.uid] || [];
+    var minutes = mealMinutes(plan);
     var same = group.length &&
       group[0].content === plan.content &&
       sameDue(group[0], plan) &&
-      hasLabel(group[0]);
+      hasLabel(group[0]) &&
+      durationAmount(group[0]) === minutes;
     var payload = {
       content: plan.content,
       description: MARKER + plan.uid,
@@ -470,6 +495,10 @@ function run() {
     var dueKey;
     for (dueKey in due) {
       if (due.hasOwnProperty(dueKey)) payload[dueKey] = due[dueKey];
+    }
+    if (minutes) {
+      payload.duration = minutes;
+      payload.duration_unit = "minute";
     }
     var res = null;
     if (!group.length) {
