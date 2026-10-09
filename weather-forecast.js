@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: MIT
 //
 // 7:00 profile. One Todoist task per day (today + next 6), label "weather".
-// Today before 9:00 is morning (07:00) → afternoon (until 18:00).
-// From 9:00 until 18:00, today starts at the current hour.
-// After 18:00 today's task is left as it is. Later days are one daytime line.
-// The same tasks are updated on the next run; days that fall out of the
-// window are deleted. Paste into Tasker → Code → JavaScriptlet.
+// Working-day halves: morning 09:00–13:00, afternoon 13:00–17:00.
+// Today before 9:00 uses the full morning half; from 9:00 until 17:00
+// today's line starts at the current hour. After 17:00 today's task is kept.
+// Later days are morning → afternoon. Paste into Tasker → Code → JavaScriptlet.
 //
 // Needs %TODOIST_TOKEN. Forecast is always for Fintry, Stirlingshire.
 
@@ -15,11 +14,13 @@ var LABEL = "weather";
 var MARKER = "tasker-weather";
 var FINTRY_LAT = "56.05335";
 var FINTRY_LON = "-4.22404";
-var MORNING = [7, 8, 9, 10, 11];
-var AFTERNOON = [12, 13, 14, 15, 16, 17];
-var DAYTIME = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+// Hour starts included in each half (9–12 = until 13:00; 13–16 = until 17:00)
+var MORNING = [9, 10, 11, 12];
+var AFTERNOON = [13, 14, 15, 16];
+var DAYTIME = [9, 10, 11, 12, 13, 14, 15, 16];
 var SLIDE_FROM = 9;
-var DAY_END = 18;
+var DAY_END = 17;
+var MIDDAY = 13;
 
 function isBlank(v) {
   if (v == null) return true;
@@ -117,12 +118,19 @@ function todayContent(day, nowHour) {
   var afternoonHours = [];
   var h;
   for (h = start; h < DAY_END; h++) {
-    if (h < 12) morningHours.push(h);
+    if (h < MIDDAY) morningHours.push(h);
     else afternoonHours.push(h);
   }
   return formatToday(
     summarize(pickHours(day, morningHours)),
     summarize(pickHours(day, afternoonHours))
+  );
+}
+
+function dayContent(day) {
+  return formatToday(
+    summarize(pickHours(day, MORNING)),
+    summarize(pickHours(day, AFTERNOON))
   );
 }
 
@@ -153,7 +161,7 @@ function buildPlans(data, nowHour) {
     }
     var content = i === 0
       ? todayContent(day, nowHour)
-      : formatLine(summarize(pickHours(day, DAYTIME)));
+      : dayContent(day);
     if (content) plans.push({ date: date, content: content });
   }
   return plans;

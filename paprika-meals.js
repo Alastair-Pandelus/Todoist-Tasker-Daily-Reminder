@@ -307,6 +307,15 @@ function durationAmount(task) {
   return amount;
 }
 
+function hasParallel(task) {
+  var labels = task.labels || [];
+  var i;
+  for (i = 0; i < labels.length; i++) {
+    if (labels[i] === "parallel") return true;
+  }
+  return false;
+}
+
 function hasLabel(task) {
   var labels = task.labels || [];
   var i;
@@ -509,13 +518,14 @@ function run() {
       group[0].content === plan.content &&
       sameDue(group[0], plan) &&
       hasLabel(group[0]) &&
+      (plan.content !== PREP_CONTENT || hasParallel(group[0])) &&
       durationAmount(group[0]) === minutes &&
       String(group[0].description || "") === description &&
       (!priority || parseInt(group[0].priority, 10) === priority);
     var payload = {
       content: plan.content,
       description: description,
-      labels: [LABEL]
+      labels: plan.content === PREP_CONTENT ? [LABEL, "parallel"] : [LABEL]
     };
     if (priority) payload.priority = priority;
     var due = dueFields(plan);
